@@ -124,7 +124,7 @@ public class HomeController {
         serviceUsuarios.guardar(usuario);
         attributes.addFlashAttribute("msg", "Usuario Registrado");
         System.out.println("Usuario: " + usuario);
-        return "redirect:/usuarios/index";
+        return "redirect:/index";
     }
 
     @GetMapping("/search")
