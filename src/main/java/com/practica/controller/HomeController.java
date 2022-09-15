@@ -11,17 +11,20 @@ import org.springframework.beans.propertyeditors.CustomDateEditor;
 import org.springframework.beans.propertyeditors.StringTrimmerEditor;
 import org.springframework.data.domain.Example;
 import org.springframework.data.domain.ExampleMatcher;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.authentication.logout.SecurityContextLogoutHandler;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.ObjectError;
 import org.springframework.web.bind.WebDataBinder;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.InitBinder;
-import org.springframework.web.bind.annotation.ModelAttribute;
-import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpSession;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.LinkedList;
@@ -38,6 +41,9 @@ public class HomeController {
 
     @Autowired
     private ICategoriasService serviceCategorias;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     @GetMapping("/tabla")
     public String mostrarTabla(Model model){
@@ -74,6 +80,24 @@ public class HomeController {
         return "home";
     }
 
+    //Damos uso al objeto auth para obtener datos del usuario iniciado
+    @GetMapping("/index")
+    public String mostrarIndex(Authentication auth, HttpSession session){
+        String username = auth.getName();
+        System.out.println("Nombre del usuario: " + username);
+        for(GrantedAuthority rol: auth.getAuthorities()){
+            System.out.println("ROL: " + rol.getAuthority());
+        }
+
+        if(session.getAttribute("Usuario") == null){
+            Usuario usuario = serviceUsuarios.buscarPorUsername(username);
+            usuario.setPassword(null);
+            System.out.println("Usuario: " + usuario);
+            session.setAttribute("usuario", usuario);
+        }
+        return "redirect:/";
+    }
+
     @GetMapping("/signup")
     public String registrarse(Usuario usuario){
         return "usuarios/formRegistro";
@@ -81,6 +105,11 @@ public class HomeController {
 
     @PostMapping("/signup")
     public String guardarRegistro(Usuario usuario, BindingResult result, RedirectAttributes attributes){
+
+        String pwdPlano = usuario.getPassword();
+        String pwdEncriptado = passwordEncoder.encode(pwdPlano);
+        usuario.setPassword(pwdEncriptado);
+
         if(result.hasErrors()){
             for(ObjectError error : result.getAllErrors()){
                 System.out.println("Ocurrio un error: "+ error.getDefaultMessage());
@@ -115,6 +144,25 @@ public class HomeController {
         model.addAttribute("vacantes", serviceVacantes.buscarDestacadas());
         model.addAttribute("categorias", serviceCategorias.buscarTodas());
         model.addAttribute("search", vacanteSearch);
+    }
+
+    @GetMapping("/login")
+    public String mostrarLogin(){
+        return "formLogin";
+    }
+
+    @GetMapping("/logout")
+    public String logout(HttpServletRequest request){
+        SecurityContextLogoutHandler logoutHandler =
+                new SecurityContextLogoutHandler();
+        logoutHandler.logout(request, null, null);
+        return "redirect:/login";
+    }
+
+    @GetMapping("/bcrypt/{texto}")
+    @ResponseBody
+    public String encriptar(@PathVariable("texto") String texto){
+        return texto + " Encriptado en Bcrypt: " + passwordEncoder.encode(texto);
     }
 
     @InitBinder
